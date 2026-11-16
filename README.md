@@ -1,4 +1,4 @@
-# admitere360
+# RoAdmitere
 
 Platforma pentru admiterea la facultate: candidatul isi face cont, isi completeaza profilul si dosarul, apoi aplica la una sau mai multe universitati.
 
@@ -19,7 +19,7 @@ npm start
 
 Apoi deschizi http://localhost:3000. Nu trebuie `npm install`, proiectul nu are pachete externe. Opresti serverul cu Ctrl+C.
 
-Alt port: `PORT=3001 npm start`
+Teste: `npm test`
 
 ## Cum lucram
 
