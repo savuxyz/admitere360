@@ -54,3 +54,42 @@ test('ADMITERE-68: rolul nu se poate alege din cerere', async () => {
   await call('POST', '/api/register', { ...cont('hacker@exemplu.demo'), role: 'admin', rol: 'admin' });
   assert.equal(db.prepare('SELECT role FROM users WHERE email = ?').get('hacker@exemplu.demo').role, 'candidate');
 });
+
+// pastreaza cookie-ul de sesiune intre cereri, ca un browser
+async function as(sid, method, path, data) {
+  const headers = sid ? { Cookie: sid } : {};
+  if (data) headers['Content-Type'] = 'application/json';
+  const r = await fetch(base + path, { method, headers, body: data && JSON.stringify(data) });
+  return { status: r.status, body: await r.json().catch(() => null), sid: r.headers.get('set-cookie')?.split(';')[0] };
+}
+
+test('ADMITERE-69: parola gresita nu intra', async () => {
+  const r = await call('POST', '/api/login', { email: 'ana@exemplu.demo', parola: 'gresita123' });
+  assert.equal(r.status, 401);
+  assert.equal(r.body.eroare, 'E-mailul sau parola sunt incorecte.');
+  const r2 = await call('POST', '/api/login', { email: 'nimeni@exemplu.demo', parola: 'gresita123' });
+  assert.deepEqual(r2.body, r.body);
+});
+
+test('ADMITERE-69: conturile demo intra si ajung la rolul lor', async () => {
+  for (const [email, rol] of [['ana@exemplu.demo', 'candidate'], ['operator@aurora.demo', 'operator'], ['admin@aurora.demo', 'admin']]) {
+    const { status, sid } = await as(null, 'POST', '/api/login', { email, parola: 'demo1234' });
+    assert.equal(status, 200);
+    const me = await as(sid, 'GET', '/api/me');
+    assert.deepEqual(me.body, { email, rol });
+  }
+});
+
+test('ADMITERE-69: cont nou -> login -> logout inchide accesul', async () => {
+  await call('POST', '/api/register', cont('ion@exemplu.demo'));
+  const { sid } = await as(null, 'POST', '/api/login', { email: 'ION@exemplu.demo', parola: 'parola123' });
+  assert.match(sid, /^sid=[a-f0-9]{64}$/);
+  assert.equal((await as(sid, 'GET', '/api/me')).status, 200);
+  await as(sid, 'POST', '/api/logout', {});
+  assert.equal((await as(sid, 'GET', '/api/me')).status, 401);
+});
+
+test('ADMITERE-69: fara login nu ai acces', async () => {
+  assert.equal((await call('GET', '/api/me')).status, 401);
+  assert.equal((await as('sid=' + 'a'.repeat(64), 'GET', '/api/me')).status, 401);
+});

@@ -21,6 +21,16 @@ Apoi deschizi http://localhost:3000. Nu trebuie `npm install`, proiectul nu are 
 
 Teste: `npm test`
 
+## Conturi demo
+
+Parola pentru toate: `demo1234`
+
+- Candidat: `ana@exemplu.demo`
+- Operator Aurora: `operator@aurora.demo`
+- Administrator Aurora: `admin@aurora.demo`
+
+Datele se salveaza in `data/roadmitere.db`. Ca sa pornesti de la zero, stergi folderul `data`.
+
 ## Cum lucram
 
 1. Iei un task din Jira si il muti in In curs.

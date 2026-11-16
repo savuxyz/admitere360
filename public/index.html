@@ -35,8 +35,22 @@ a{color:var(--ac);cursor:pointer}
 <body>
 <div class="demo">Demo educațional – universități și date fictive</div>
 
+<!-- autentificare -->
+<form class="card" id="v-login" hidden novalidate>
+  <div class="logo"><b>ro</b>Admitere</div>
+  <p class="slogan">Un singur dosar pentru toate candidaturile</p>
+  <h3>Autentificare</h3>
+  <div class="msg" hidden></div>
+  <div class="f"><label for="l-email">E-mail</label><input id="l-email" name="email" type="email" autocomplete="email"><div class="err"></div></div>
+  <div class="f"><label for="l-parola">Parolă</label><input id="l-parola" name="parola" type="password" autocomplete="current-password"><div class="err"></div></div>
+  <button>Intră în cont</button>
+  <p class="mut">Conturi demo (parola: demo1234):</p>
+  <button type="button" class="g" data-demo="ana@exemplu.demo">Candidat</button><button type="button" class="g" data-demo="operator@aurora.demo">Operator Aurora</button><button type="button" class="g" data-demo="admin@aurora.demo">Administrator Aurora</button>
+  <p class="mut">Nu ai cont? <a data-go="register">Creează unul</a></p>
+</form>
+
 <!-- creare cont -->
-<form class="card" id="v-register" novalidate>
+<form class="card" id="v-register" hidden novalidate>
   <div class="logo"><b>ro</b>Admitere</div>
   <p class="slogan">Un singur dosar pentru toate candidaturile</p>
   <h3>Creează cont</h3>
@@ -46,7 +60,18 @@ a{color:var(--ac);cursor:pointer}
   <div class="f"><label for="r-confirmare">Confirmă parola</label><input id="r-confirmare" name="confirmare" type="password" autocomplete="new-password"><div class="err"></div></div>
   <div class="f"><label class="chk"><input name="termeni" type="checkbox">Sunt de acord cu Termenii și Politica de confidențialitate</label><div class="err"></div></div>
   <button>Creează cont</button>
+  <p class="mut">Ai deja cont? <a data-go="login">Autentifică-te</a></p>
 </form>
+
+<!-- zona privata, profilul vine in ADMITERE-50 -->
+<div class="card" id="v-cont" hidden>
+  <div class="logo"><b>ro</b>Admitere</div>
+  <p class="slogan">Un singur dosar pentru toate candidaturile</p>
+  <h3>Contul meu</h3>
+  <p><span id="c-email"></span><br><span class="mut" id="c-rol"></span></p>
+  <p class="mut" id="c-info"></p>
+  <button type="button" class="g" id="logout">Ieșire</button>
+</div>
 
 <script>
 const $ = (s) => document.querySelector(s);
@@ -84,11 +109,54 @@ async function submit(form, fn) {
   finally { btn.disabled = false; }
 }
 
-$('#v-register').onsubmit = (e) => { e.preventDefault(); submit(e.target, async (d) => {
-  const r = await api('POST', '/api/register', d);
-  if (r.status === 201) { e.target.reset(); showErrors(e.target, { eroare: 'Contul a fost creat. Confirmarea e-mailului este simulată în demo.' }, 'ok'); }
+function show(view) {
+  for (const v of ['login', 'register', 'cont']) $('#v-' + v).hidden = v !== view;
+}
+
+const ROLURI = { candidate: 'Candidat', operator: 'Operator', admin: 'Administrator' };
+const INFO = {
+  candidate: 'Aici vei completa profilul și dosarul.',
+  operator: 'Panoul operatorului este în dezvoltare.',
+  admin: 'Panoul de administrare este în dezvoltare.',
+};
+
+// intreaba serverul daca suntem logati si arata pagina potrivita rolului
+async function start() {
+  const { status, body } = await api('GET', '/api/me');
+  if (status !== 200) return show('login');
+  $('#c-email').textContent = body.email;
+  $('#c-rol').textContent = ROLURI[body.rol];
+  $('#c-info').textContent = INFO[body.rol];
+  show('cont');
+}
+
+$('#v-login').onsubmit = (e) => { e.preventDefault(); submit(e.target, async (d) => {
+  const r = await api('POST', '/api/login', d);
+  if (r.status === 200) { e.target.reset(); showErrors(e.target, {}); start(); }
   else showErrors(e.target, r.body);
 }); };
+
+// dupa creare mergem la login cu e-mailul deja scris
+$('#v-register').onsubmit = (e) => { e.preventDefault(); submit(e.target, async (d) => {
+  const r = await api('POST', '/api/register', d);
+  if (r.status !== 201) return showErrors(e.target, r.body);
+  e.target.reset(); showErrors(e.target, {});
+  const l = $('#v-login');
+  l.elements.email.value = d.email;
+  showErrors(l, { eroare: 'Contul a fost creat. Confirmarea e-mailului este simulată în demo. Te poți autentifica.' }, 'ok');
+  show('login');
+  l.elements.parola.focus();
+}); };
+
+$('#logout').onclick = async () => { await api('POST', '/api/logout', {}); show('login'); };
+
+document.querySelectorAll('[data-demo]').forEach((b) => b.onclick = () => {
+  $('#v-login').elements.email.value = b.dataset.demo;
+  $('#v-login').elements.parola.value = 'demo1234';
+});
+document.querySelectorAll('[data-go]').forEach((a) => a.onclick = () => show(a.dataset.go));
+
+start();
 </script>
 </body>
 </html>

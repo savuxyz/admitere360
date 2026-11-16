@@ -21,8 +21,23 @@ export function openDb(path) {
       role           TEXT NOT NULL DEFAULT 'candidate' CHECK (role IN ('candidate', 'operator', 'admin')),
       created_at     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE TABLE IF NOT EXISTS sessions (
+      token      TEXT PRIMARY KEY,
+      user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at INTEGER NOT NULL
+    );
   `);
+  seedDemo(db);
   return db;
+}
+
+// conturile demo din ADMITERE-63 (Candidat, Operator Aurora, Administrator Aurora)
+export const DEMO_PASSWORD = 'demo1234';
+const DEMO = [['ana@exemplu.demo', 'candidate'], ['operator@aurora.demo', 'operator'], ['admin@aurora.demo', 'admin']];
+function seedDemo(db) {
+  const add = db.prepare('INSERT INTO users (id, email, password_hash, email_verified, role) VALUES (?, ?, ?, 1, ?)');
+  const has = db.prepare('SELECT 1 FROM users WHERE email = ?');
+  for (const [email, role] of DEMO) if (!has.get(email)) add.run(randomUUID(), email, hashPassword(DEMO_PASSWORD), role);
 }
 
 // parole (scrypt cu salt, nu se salveaza niciodata in clar)
@@ -59,8 +74,11 @@ function checkRegister(b) {
 }
 
 // http
-function send(res, status, body) {
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+const SESSION_DAYS = 7;
+const cookie = (token, maxAge) => `sid=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}`;
+
+function send(res, status, body, headers = {}) {
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', ...headers });
   res.end(JSON.stringify(body));
 }
 
@@ -77,9 +95,24 @@ function readJson(req) {
 
 export function createApp(db) {
   const q = {
-    userByEmail: db.prepare('SELECT id FROM users WHERE email = ?'),
+    userByEmail: db.prepare('SELECT id, password_hash, role FROM users WHERE email = ?'),
     // rolul nu vine din cerere, orice cont nou e candidat
     insertUser: db.prepare("INSERT INTO users (id, email, password_hash, email_verified, role) VALUES (?, ?, ?, 1, 'candidate')"),
+    insertSession: db.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)'),
+    deleteSession: db.prepare('DELETE FROM sessions WHERE token = ?'),
+    sessionUser: db.prepare('SELECT u.id, u.email, u.role FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ? AND s.expires_at > ?'),
+  };
+
+  // sesiunea e un token random in cookie HttpOnly, salvat in baza de date
+  const tokenOf = (req) => /(?:^|;\s*)sid=([a-f0-9]{64})/.exec(req.headers.cookie ?? '')?.[1];
+  const currentUser = (req) => {
+    const t = tokenOf(req);
+    return t ? q.sessionUser.get(t, Date.now()) : undefined;
+  };
+  const startSession = (userId) => {
+    const token = randomBytes(32).toString('hex');
+    q.insertSession.run(token, userId, Date.now() + SESSION_DAYS * 864e5);
+    return { 'Set-Cookie': cookie(token, SESSION_DAYS * 86400) };
   };
 
   const routes = {
@@ -90,6 +123,23 @@ export function createApp(db) {
       if (Object.keys(e).length) return send(res, 400, { erori: e });
       q.insertUser.run(randomUUID(), email, hashPassword(b.parola));
       send(res, 201, { ok: true });
+    },
+    'POST /api/login': (req, res, b) => {
+      const u = q.userByEmail.get(str(b.email).toLowerCase());
+      if (!u || typeof b.parola !== 'string' || !verifyPassword(b.parola, u.password_hash))
+        return send(res, 401, { eroare: 'E-mailul sau parola sunt incorecte.' });
+      send(res, 200, { rol: u.role }, startSession(u.id));
+    },
+    'POST /api/logout': (req, res) => {
+      const t = tokenOf(req);
+      if (t) q.deleteSession.run(t);
+      send(res, 200, { ok: true }, { 'Set-Cookie': cookie('', 0) });
+    },
+    // cine e logat, de aici interfata stie ce sa arate
+    'GET /api/me': (req, res) => {
+      const u = currentUser(req);
+      if (!u) return send(res, 401, { eroare: 'Trebuie să te autentifici.' });
+      send(res, 200, { email: u.email, rol: u.role });
     },
   };
 
@@ -102,7 +152,7 @@ export function createApp(db) {
     const handler = routes[`${req.method} ${path}`];
     if (!handler) return send(res, 404, { eroare: 'Pagina nu există.' });
     try {
-      handler(req, res, await readJson(req));
+      handler(req, res, req.method === 'GET' ? {} : await readJson(req));
     } catch {
       send(res, 400, { eroare: 'Cerere invalidă.' });
     }
