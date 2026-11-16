@@ -9,6 +9,18 @@ Proiect de echipa la disciplina Instrumente software pentru grupuri de lucru. Ta
 - Node.js 22.13 sau mai nou (`node -v`)
 - Git
 
+## Cum pornesti proiectul
+
+```
+git clone https://github.com/savuxyz/admitere360.git
+cd admitere360
+npm start
+```
+
+Apoi deschizi http://localhost:3000. Nu trebuie `npm install`, proiectul nu are pachete externe. Opresti serverul cu Ctrl+C.
+
+Alt port: `PORT=3001 npm start`
+
 ## Cum lucram
 
 1. Iei un task din Jira si il muti in In curs.
