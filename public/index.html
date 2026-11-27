@@ -3,26 +3,163 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>admitere360</title>
+<title>RoAdmitere</title>
 <style>
 /* culorile si stilul din prototip */
-:root{--bg:#fff;--fg:#111;--mut:#666;--ac:#ff5a4f;--acbg:#fff0ee;--bd:#e6e6e6;--card:#fff}
-@media (prefers-color-scheme:dark){:root{--bg:#141414;--fg:#f3f3f3;--mut:#a0a0a0;--acbg:#3a1f1c;--bd:#333;--card:#1c1c1c}}
+:root{--bg:#fff;--fg:#111;--mut:#666;--ac:#ff2d46;--acbg:#fff0f1;--bd:#e6e6e6;--card:#fff;--ok:#1a7f4b}
+@media (prefers-color-scheme:dark){:root{--bg:#141414;--fg:#f3f3f3;--mut:#a0a0a0;--acbg:#3a1c20;--bd:#333;--card:#1c1c1c;--ok:#4ade80}}
 *{box-sizing:border-box}html{color-scheme:light dark}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 .demo{background:var(--acbg);font-size:13px;text-align:center;padding:6px 10px;border-bottom:1px solid var(--bd)}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:20px;max-width:440px;margin:32px auto}
 @media(max-width:480px){.card{margin:16px;padding:16px}}
-.logo{font-weight:800;font-size:24px;letter-spacing:-.5px;margin-bottom:8px}.logo b{color:var(--ac)}
-.mut{color:var(--mut);font-size:14px}
+.logo{font-weight:800;font-size:26px;letter-spacing:-.5px}.logo b{color:var(--ac)}
+.slogan{color:var(--mut);font-size:13px;margin:0 0 16px}
+h3{margin:0 0 8px}.mut{color:var(--mut);font-size:14px}
+.f{margin:12px 0}.f>label{display:block;font-size:13px;color:var(--mut);margin-bottom:3px}
+input{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:10px;width:100%}
+input[type=checkbox]{width:auto;margin:0 8px 0 0}
+.chk{display:flex;align-items:flex-start;font-size:14px}
+input[aria-invalid=true]{border-color:var(--ac)}
+.err{color:var(--ac);font-size:13px;margin-top:3px}
+button{font:inherit;background:var(--ac);color:#fff;border:0;border-radius:10px;padding:10px 16px;cursor:pointer;margin:8px 6px 0 0;min-height:44px}
+button.g{background:none;color:var(--fg);border:1px solid var(--bd)}
+button:disabled{opacity:.5;cursor:wait}
+a{color:var(--ac);cursor:pointer}
+.msg{padding:8px 12px;border-radius:8px;margin:8px 0;font-size:14px}
+.msg.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}
+.msg.er{color:var(--ac);background:var(--acbg)}
+[hidden]{display:none!important}
 </style>
 </head>
 <body>
-<div class="demo">Versiune demonstrativă. Folosește doar date fictive.</div>
-<div class="card">
-  <div class="logo">admitere<b>360</b></div>
-  <h3>Platforma de admitere — în dezvoltare</h3>
-  <p class="mut">Aici vor apărea crearea contului, autentificarea și profilul candidatului.</p>
+<div class="demo">Demo educațional – universități și date fictive</div>
+
+<!-- autentificare -->
+<form class="card" id="v-login" hidden novalidate>
+  <div class="logo"><b>ro</b>Admitere</div>
+  <p class="slogan">Un singur dosar pentru toate candidaturile</p>
+  <h3>Autentificare</h3>
+  <div class="msg" hidden></div>
+  <div class="f"><label for="l-email">E-mail</label><input id="l-email" name="email" type="email" autocomplete="email"><div class="err"></div></div>
+  <div class="f"><label for="l-parola">Parolă</label><input id="l-parola" name="parola" type="password" autocomplete="current-password"><div class="err"></div></div>
+  <button>Intră în cont</button>
+  <p class="mut">Conturi demo (parola: demo1234):</p>
+  <button type="button" class="g" data-demo="ana@exemplu.demo">Candidat</button><button type="button" class="g" data-demo="operator@aurora.demo">Operator Aurora</button><button type="button" class="g" data-demo="admin@aurora.demo">Administrator Aurora</button>
+  <p class="mut">Nu ai cont? <a data-go="register">Creează unul</a></p>
+</form>
+
+<!-- creare cont -->
+<form class="card" id="v-register" hidden novalidate>
+  <div class="logo"><b>ro</b>Admitere</div>
+  <p class="slogan">Un singur dosar pentru toate candidaturile</p>
+  <h3>Creează cont</h3>
+  <div class="msg" hidden></div>
+  <div class="f"><label for="r-email">E-mail</label><input id="r-email" name="email" type="email" autocomplete="email"><div class="err"></div></div>
+  <div class="f"><label for="r-parola">Parolă</label><input id="r-parola" name="parola" type="password" autocomplete="new-password"><div class="err"></div></div>
+  <div class="f"><label for="r-confirmare">Confirmă parola</label><input id="r-confirmare" name="confirmare" type="password" autocomplete="new-password"><div class="err"></div></div>
+  <div class="f"><label class="chk"><input name="termeni" type="checkbox">Sunt de acord cu Termenii și Politica de confidențialitate</label><div class="err"></div></div>
+  <button>Creează cont</button>
+  <p class="mut">Ai deja cont? <a data-go="login">Autentifică-te</a></p>
+</form>
+
+<!-- zona privata, profilul vine in ADMITERE-50 -->
+<div class="card" id="v-cont" hidden>
+  <div class="logo"><b>ro</b>Admitere</div>
+  <p class="slogan">Un singur dosar pentru toate candidaturile</p>
+  <h3>Contul meu</h3>
+  <p><span id="c-email"></span><br><span class="mut" id="c-rol"></span></p>
+  <p class="mut" id="c-info"></p>
+  <button type="button" class="g" id="logout">Ieșire</button>
 </div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+
+// trimite cererea la server si intoarce status + raspuns
+async function api(method, url, data) {
+  const r = await fetch(url, { method, headers: data ? { 'Content-Type': 'application/json' } : {}, body: data ? JSON.stringify(data) : undefined });
+  return { status: r.status, body: await r.json().catch(() => ({})) };
+}
+
+// mesajul general sus si erorile sub fiecare camp
+function showErrors(form, body, cls = 'er') {
+  const msg = form.querySelector('.msg');
+  msg.hidden = !body.eroare; msg.className = 'msg ' + cls; msg.textContent = body.eroare || '';
+  for (const input of form.querySelectorAll('input')) {
+    const e = body.erori?.[input.name];
+    input.setAttribute('aria-invalid', e ? 'true' : 'false');
+    input.closest('.f').querySelector('.err').textContent = e || '';
+  }
+}
+
+// citeste formularul, bifele devin true/false
+function formData(form) {
+  const d = Object.fromEntries(new FormData(form));
+  for (const c of form.querySelectorAll('input[type=checkbox]')) d[c.name] = c.checked;
+  return d;
+}
+
+// blocheaza butonul cat timp asteptam serverul
+async function submit(form, fn) {
+  const btn = form.querySelector('button:not([type=button])');
+  btn.disabled = true;
+  try { await fn(formData(form)); }
+  catch { showErrors(form, { eroare: 'Serverul nu răspunde. Încearcă din nou.' }); }
+  finally { btn.disabled = false; }
+}
+
+function show(view) {
+  for (const v of ['login', 'register', 'cont']) $('#v-' + v).hidden = v !== view;
+}
+
+const ROLURI = { candidate: 'Candidat', operator: 'Operator', admin: 'Administrator' };
+const INFO = {
+  candidate: 'Aici vei completa profilul și dosarul.',
+  operator: 'Panoul operatorului este în dezvoltare.',
+  admin: 'Panoul de administrare este în dezvoltare.',
+};
+
+// intreaba serverul daca suntem logati si arata pagina potrivita rolului
+async function start() {
+  const { status, body } = await api('GET', '/api/me');
+  if (status !== 200) return show('login');
+  $('#c-email').textContent = body.email;
+  $('#c-rol').textContent = ROLURI[body.rol];
+  $('#c-info').textContent = INFO[body.rol];
+  show('cont');
+}
+
+$('#v-login').onsubmit = (e) => { e.preventDefault(); submit(e.target, async (d) => {
+  const r = await api('POST', '/api/login', d);
+  if (r.status === 200) { e.target.reset(); showErrors(e.target, {}); start(); }
+  else showErrors(e.target, r.body);
+}); };
+
+// dupa creare mergem la login cu e-mailul deja scris
+$('#v-register').onsubmit = (e) => { e.preventDefault(); submit(e.target, async (d) => {
+  const r = await api('POST', '/api/register', d);
+  if (r.status !== 201) return showErrors(e.target, r.body);
+  e.target.reset(); showErrors(e.target, {});
+  const l = $('#v-login');
+  l.elements.email.value = d.email;
+  showErrors(l, { eroare: 'Contul a fost creat. Confirmarea e-mailului este simulată în demo. Te poți autentifica.' }, 'ok');
+  show('login');
+  l.elements.parola.focus();
+}); };
+
+$('#logout').onclick = async () => { await api('POST', '/api/logout', {}); show('login'); };
+
+document.querySelectorAll('[data-demo]').forEach((b) => b.onclick = () => {
+  $('#v-login').elements.email.value = b.dataset.demo;
+  $('#v-login').elements.parola.value = 'demo1234';
+});
+document.querySelectorAll('[data-go]').forEach((a) => a.onclick = () => show(a.dataset.go));
+
+// la Back/Forward browserul poate arata pagina veche din memorie, asa ca verificam iar sesiunea
+addEventListener('pageshow', (e) => { if (e.persisted) start(); });
+
+start();
+</script>
 </body>
 </html>
