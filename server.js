@@ -19,6 +19,8 @@ export function openDb(path) {
       password_hash  TEXT NOT NULL,
       email_verified INTEGER NOT NULL DEFAULT 0,
       role           TEXT NOT NULL DEFAULT 'candidate' CHECK (role IN ('candidate', 'operator', 'admin')),
+      failed_logins  INTEGER NOT NULL DEFAULT 0,
+      locked_until   INTEGER NOT NULL DEFAULT 0,
       created_at     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
     CREATE TABLE IF NOT EXISTS sessions (
@@ -73,29 +75,53 @@ function checkRegister(b) {
   return [email, e];
 }
 
+function checkLogin(b) {
+  const e = {};
+  const email = str(b.email).toLowerCase();
+  const m = checkEmail(email);
+  if (m) e.email = m;
+  if (!b.parola || typeof b.parola !== 'string') e.parola = 'Introdu parola.';
+  return [email, e];
+}
+
 // http
 const SESSION_DAYS = 7;
+const MAX_TRIES = 5;
+const LOCK_MINUTES = 15;
+const MAX_BODY = 10_000;
 const cookie = (token, maxAge) => `sid=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}`;
+// no-store ca dupa logout butonul Back sa nu mai arate pagina din cache (ADMITERE-81 TC-06)
+const NO_CACHE = { 'Cache-Control': 'no-store' };
 
 function send(res, status, body, headers = {}) {
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', ...headers });
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', ...NO_CACHE, ...headers });
   res.end(JSON.stringify(body));
 }
 
 function readJson(req) {
   return new Promise((resolve, reject) => {
+    let size = 0;
     const chunks = [];
-    req.on('data', (c) => chunks.push(c));
+    // daca e prea mare nu mai pastram nimic, dar citim pana la capat ca sa putem raspunde
+    req.on('data', (c) => {
+      size += c.length;
+      if (size <= MAX_BODY) chunks.push(c);
+    });
     req.on('end', () => {
+      if (size > MAX_BODY) return reject(Object.assign(new Error('prea mare'), { status: 413 }));
       try { resolve(JSON.parse(Buffer.concat(chunks).toString() || '{}')); }
-      catch { reject(new Error('json')); }
+      catch { reject(Object.assign(new Error('json'), { status: 400 })); }
     });
   });
 }
 
+// hash fals, ca un e-mail inexistent sa dureze cat unul existent
+const DUMMY_HASH = hashPassword('nu-exista-1');
+
 export function createApp(db) {
   const q = {
-    userByEmail: db.prepare('SELECT id, password_hash, role FROM users WHERE email = ?'),
+    userByEmail: db.prepare('SELECT id, password_hash, role, failed_logins, locked_until FROM users WHERE email = ?'),
+    setFails: db.prepare('UPDATE users SET failed_logins = ?, locked_until = ? WHERE id = ?'),
     // rolul nu vine din cerere, orice cont nou e candidat
     insertUser: db.prepare("INSERT INTO users (id, email, password_hash, email_verified, role) VALUES (?, ?, ?, 1, 'candidate')"),
     insertSession: db.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)'),
@@ -125,9 +151,22 @@ export function createApp(db) {
       send(res, 201, { ok: true });
     },
     'POST /api/login': (req, res, b) => {
-      const u = q.userByEmail.get(str(b.email).toLowerCase());
-      if (!u || typeof b.parola !== 'string' || !verifyPassword(b.parola, u.password_hash))
+      const [email, e] = checkLogin(b);
+      if (Object.keys(e).length) return send(res, 400, { erori: e });
+      const u = q.userByEmail.get(email);
+      const now = Date.now();
+      const locked = { eroare: `Prea multe încercări. Încearcă din nou peste ${LOCK_MINUTES} minute.` };
+      if (u && u.locked_until > now) return send(res, 429, locked);
+      if (!verifyPassword(b.parola, u?.password_hash ?? DUMMY_HASH) || !u) {
+        // dupa 5 greseli la rand contul se blocheaza 15 minute (ADMITERE-63)
+        if (u) {
+          const n = u.failed_logins + 1;
+          if (n >= MAX_TRIES) { q.setFails.run(0, now + LOCK_MINUTES * 60_000, u.id); return send(res, 429, locked); }
+          q.setFails.run(n, 0, u.id);
+        }
         return send(res, 401, { eroare: 'E-mailul sau parola sunt incorecte.' });
+      }
+      q.setFails.run(0, 0, u.id);
       send(res, 200, { rol: u.role }, startSession(u.id));
     },
     'POST /api/logout': (req, res) => {
@@ -146,15 +185,25 @@ export function createApp(db) {
   return async (req, res) => {
     const path = new URL(req.url, 'http://x').pathname;
     if (req.method === 'GET' && path === '/') {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', ...NO_CACHE });
       return res.end(INDEX);
     }
     const handler = routes[`${req.method} ${path}`];
+    // raspuns scurt, fara detalii despre ce exista pe server (ADMITERE-53)
     if (!handler) return send(res, 404, { eroare: 'Pagina nu există.' });
     try {
-      handler(req, res, req.method === 'GET' ? {} : await readJson(req));
-    } catch {
-      send(res, 400, { eroare: 'Cerere invalidă.' });
+      let body = {};
+      if (req.method !== 'GET') {
+        // doar json, ca sa nu poata trimite alt site formulare in numele userului
+        if (!req.headers['content-type']?.startsWith('application/json')) return send(res, 415, { eroare: 'Cerere invalidă.' });
+        body = await readJson(req);
+        if (!body || typeof body !== 'object' || Array.isArray(body)) return send(res, 400, { eroare: 'Cerere invalidă.' });
+      }
+      handler(req, res, body);
+    } catch (err) {
+      if (err.status) return send(res, err.status, { eroare: 'Cerere invalidă.' });
+      console.error(err.message);
+      send(res, 500, { eroare: 'A apărut o eroare. Încearcă din nou.' });
     }
   };
 }

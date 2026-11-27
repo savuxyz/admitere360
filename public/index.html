@@ -156,6 +156,9 @@ document.querySelectorAll('[data-demo]').forEach((b) => b.onclick = () => {
 });
 document.querySelectorAll('[data-go]').forEach((a) => a.onclick = () => show(a.dataset.go));
 
+// la Back/Forward browserul poate arata pagina veche din memorie, asa ca verificam iar sesiunea
+addEventListener('pageshow', (e) => { if (e.persisted) start(); });
+
 start();
 </script>
 </body>
